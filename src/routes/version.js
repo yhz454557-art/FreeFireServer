@@ -9,7 +9,7 @@ const loginPort = config.ports.login;
 // TLS; otherwise fall back to the derived LAN IP + login port (dev / no edge).
 // A bare domain gets https://; include a scheme in the env to override it.
 const loginDomain = (config.domains && config.domains.login) || '';
-const version = process.env.GAME_VERSION || config.version || '1.70.0';
+const version = process.env.GAME_VERSION || config.version || '1.0.0';
 const { getLocalIp } = require('../utils/address');
 
 function loginServerUrl(localIp) {
