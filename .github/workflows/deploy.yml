@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      packages: write # Garante permissão para enviar as imagens
     strategy:
       matrix:
         include:
@@ -32,7 +32,7 @@ jobs:
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
+          username: ${{ env.OWNER }} # Corrigido para bater com a organização/dono do pacote
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
@@ -48,8 +48,6 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    # Only deploy from main. Feature-branch pushes just build (validates the images)
-    # without touching the VPS.
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Pull + gated migrate + drained restart on the VPS
@@ -67,11 +65,6 @@ jobs:
             docker compose pull
 
             # --- MIGRATION GATE ---------------------------------------------------
-            # Bring up the data stores, then run forward-only migrations in a one-off
-            # container BEFORE any app service is recreated. `set -e` aborts the whole
-            # deploy if a migration fails — the running (old) stack is left untouched, so
-            # a bad schema change never takes the site down. Skipped when DATABASE_URL is
-            # unset (SQLite mode), since migrate.js is Postgres-only and would exit 1.
             docker compose up -d postgres redis
             DB_URL=$(grep -E '^DATABASE_URL=' .env 2>/dev/null | head -n1 | cut -d= -f2- || true)
             if [ -n "$DB_URL" ]; then
@@ -82,17 +75,10 @@ jobs:
             fi
 
             # --- ROLL STATELESS TIERS --------------------------------------------
-            # HTTP tiers + gateway + settlement + auth are stateless (repo + bus); recreate
-            # them straight onto the new images. Traefik load-balances replicas during the
-            # rolling swap.
             docker compose up -d --remove-orphans \
               traefik live login main gateway settlement auth-connect auth-login
 
             # --- MATCH DRAIN ------------------------------------------------------
-            # Stop FORMING new matches (halt every matchmaker replica), give in-flight CS
-            # matches a grace window to finish, THEN swap the match instances (recreating
-            # them SIGTERM-kicks any stragglers to the lobby). New matches resume once the
-            # matchmaker comes back and re-elects a leader.
             echo "[deploy] draining matches (${MATCH_DRAIN_SECONDS}s)…"
             docker compose stop matchmaker
             sleep "${MATCH_DRAIN_SECONDS}"
