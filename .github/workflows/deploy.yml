@@ -32,7 +32,7 @@ jobs:
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ env.OWNER }} # Corrigido para bater com a organização/dono do pacote
+          username: ${{ env.OWNER }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
@@ -53,7 +53,7 @@ jobs:
       - name: Pull + gated migrate + drained restart on the VPS
         uses: appleboy/ssh-action@v1.2.0
         env:
-          MATCH_DRAIN_SECONDS: ${{ vars.MATCH_DRAIN_SECONDS || '90' }}
+          MATCH_DRAIN_SECONDS: "${{ vars.MATCH_DRAIN_SECONDS || '90' }}"
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
